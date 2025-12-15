@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>자산 형성 유형 진단 챗봇</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{
+      --bg:#f5f7fa;
+      --card:#fff;
+      --primary:#2c7be5;
+      --primary-dark:#0056b3;
+      --muted:#6b7280;
+      --radius:12px;
+      --btn-height:56px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body {
+      font-family: "Noto Sans KR", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background-color:var(--bg);
+      margin:0;
+      padding:24px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .container {
+      width:100%;
+      max-width:720px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 8px 30px rgba(2,6,23,0.08);
+      padding:20px;
+    }
+    header {text-align:center; margin-bottom:12px;}
+    h1{font-size:20px;margin:0 0 6px}
+    .sub{color:var(--muted);font-size:13px}
+
+    .chat {
+      background:#fafafa;
+      border-radius:8px;
+      padding:18px;
+      min-height:180px;
+      margin:16px 0;
+      white-space:pre-line;
+      outline:none;
+    }
+
+    .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    progress{flex:1;height:12px;width:100%;border-radius:8px;appearance:none}
+    progress::-webkit-progress-bar{background:#e9eef8;border-radius:8px}
+    progress::-webkit-progress-value{background:linear-gradient(90deg,var(--primary),var(--primary-dark));border-radius:8px}
+
+    .buttons{display:flex;flex-direction:column;gap:10px}
+    button{
+      height:var(--btn-height);
+      padding:12px 16px;
+      font-size:15px;
+      border-radius:10px;
+      border:none;
+      cursor:pointer;
+      background:var(--primary);
+      color:#fff;
+      text-align:left;
+    }
+    button.secondary{background:#fff;color:#111;border:1px solid #e6eefc}
+    button:focus{outline:3px solid rgba(44,123,229,0.25)}
+    .start-row{display:flex;gap:8px;justify-content:center}
+    .lang-toggle{background:#fff;color:#111;border:1px solid #e6eefc;padding:8px 12px;border-radius:8px;height:auto}
+    .visually-hidden{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
+
+    @media (min-width:640px){
+      .buttons{flex-direction:row}
+      .buttons button{flex:1}
+    }
+  </style>
+</head>
+<body>
+  <main class="container" id="app">
+    <header aria-labelledby="title">
+      <h1 id="title">경제적 자립을 위한 자산 형성 유형 진단</h1>
+      <div class="sub">간단한 질문으로 당신의 투자 성향을 진단합니다.</div>
+    </header>
+
+    <div class="progress-row" aria-hidden="false">
+      <progress id="progress" value="0" max="3" aria-valuemin="0" aria-valuemax="3"></progress>
+      <div id="stepLabel" class="sub">0/3</div>
+    </div>
+
+    <section class="chat" id="chatBox" role="status" aria-live="polite" tabindex="0">
+      안녕하세요!  
+      당신의 경제적 자립을 도울 <strong>자산 형성 유형 진단 챗봇</strong>입니다.
+
+      아래 버튼을 눌러 진단을 시작하세요.
+    </section>
+
+    <div id="buttonArea" class="buttons" aria-controls="chatBox">
+      <div class="start-row" style="width:100%">
+        <button id="startBtn" class="lang-toggle" type="button">진단 시작</button>
+        <button id="langBtn" class="lang-toggle" type="button" aria-pressed="false">EN</button>
+      </div>
+    </div>
+
+    <div class="visually-hidden" id="srHints">질문은 숫자키 1,2,3으로 선택할 수 있습니다.</div>
+  </main>
+
+  <script>
+    (function(){
+      // 상태
+      let step = 0;
+      let score = 0;
+      const storageKey = 'bini-diagnostic-v1';
+      let lang = 'ko'; // 'ko' or 'en'
+
+      // DOM
+      const chatBox = document.getElementById('chatBox');
+      const buttonArea = document.getElementById('buttonArea');
+      const progress = document.getElementById('progress');
+      const stepLabel = document.getElementById('stepLabel');
+      const startBtn = document.getElementById('startBtn');
+      const langBtn = document.getElementById('langBtn');
+
+      // 번역 가능한 텍스트
+      const I18N = {
+        ko: {
+          start: '진단 시작',
+          restart: '다시 진단하기',
+          hints: '질문은 숫자키 1,2,3으로 선택할 수 있습니다.',
+          questions: [
+`Q1. 위험 감수 성향  
+투자한 자산이 10% 상승할 확률과 5% 하락할 확률이 공존한다면?`,
+`Q2. 투자 기간 관점  
+당신이 모은 500만 원을 언제쯤 활용하고 싶은가?`,
+`Q3. 정보 수집 성향  
+투자 결정을 내릴 때 가장 중요하게 생각하는 것은?`
+          ],
+          options: [
+            [
+              "A. 원금 5% 하락의 위험 때문에 투자를 포기한다",
+              "B. 5% 하락을 감수하고 10% 상승 기회를 노린다",
+              "C. 기회 손실이 더 크므로 적극 투자한다"
+            ],
+            [
+              "A. 1년 이내, 언제든 현금화",
+              "B. 3~5년, 일부 유동성 포기",
+              "C. 5년 이상, 장기 투자"
+            ],
+            [
+              "A. 정부·금융기관의 확실한 보장",
+              "B. 전문가의 분석과 추천",
+              "C. 스스로 분석한 성장 가능성"
+            ]
+          ],
+          results: {
+            safety: {
+              title: "진단 결과: 안전 추구형 (Safety Seeker)",
+              desc: "원금 보존을 최우선으로 하며 위험을 회피하는 성향입니다.\n\n조언:\n물가 상승을 고려하여\n낮은 위험의 분산 투자에도\n조금씩 관심을 가져보세요."
+            },
+            balanced: {
+              title: "진단 결과: 균형 성장형 (Balanced Growth Type)",
+              desc: "안정성과 수익성의 균형을 추구합니다.\n\n조언:\n경제 상황과 목표 변화에 맞춰\n자산 배분을 주기적으로 점검하세요."
+            },
+            aggressive: {
+              title: "진단 결과: 공격 투자형 (Aggressive Investor)",
+              desc: "높은 수익을 위해 위험 감수를 감수합니다.\n\n조언:\n반드시 감당 가능한 범위 내에서\n분산 투자를 실천하세요."
+            }
+          }
+        },
+        en: {
+          start: 'Start Assessment',
+          restart: 'Retake Assessment',
+          hints: 'You can choose options using number keys 1,2,3.',
+          questions: [
+`Q1. Risk tolerance  
+If an asset has a 10% chance to rise and a 5% chance to fall, what would you do?`,
+`Q2. Investment horizon  
+When would you like to use 5,000,000 KRW you've saved?`,
+`Q3. Information preference  
+What matters most when making an investment decision?`
+          ],
+          options: [
+            [
+              "A. Avoid investing due to potential 5% loss",
+              "B. Accept 5% drop for a chance of 10% gain",
+              "C. Invest actively to avoid opportunity loss"
+            ],
+            [
+              "A. Within 1 year — need liquidity",
+              "B. 3–5 years — partial liquidity tradeoff",
+              "C. 5+ years — long-term"
+            ],
+            [
+              "A. Government/financial guarantees",
+              "B. Expert analysis and recommendations",
+              "C. My own growth analysis"
+            ]
+          ],
+          results: {
+            safety: {
+              title: "Result: Safety Seeker",
+              desc: "You prioritize preservation of capital and avoid risk.\n\nAdvice:\nConsider low-risk diversified investments\nwhile accounting for inflation."
+            },
+            balanced: {
+              title: "Result: Balanced Growth Type",
+              desc: "You seek a balance between safety and returns.\n\nAdvice:\nReview asset allocation periodically\naccording to goals and economic changes."
+            },
+            aggressive: {
+              title: "Result: Aggressive Investor",
+              desc: "You accept higher risk for higher returns.\n\nAdvice:\nEnsure diversification within\nan affordable risk tolerance."
+            }
+          }
+        }
+      };
+
+      function loadState(){
+        try{
+          const raw = localStorage.getItem(storageKey);
+          if(!raw) return false;
+          const st = JSON.parse(raw);
+          if(st && typeof st.step === 'number'){
+            step = st.step;
+            score = st.score || 0;
+            lang = st.lang || lang;
+            return true;
+          }
+        }catch(e){}
+        return false;
+      }
+
+      function saveState(){
+        const st = {step, score, lang, ts: Date.now()};
+        try{ localStorage.setItem(storageKey, JSON.stringify(st)); }catch(e){}
+      }
+
+      function clearState(){ localStorage.removeItem(storageKey); }
+
+      // UI helpers
+      function setChat(text){
+        chatBox.innerText = text;
+        chatBox.focus();
+      }
+      function setButtons(buttons){
+        // buttons: array of {text, onClick, className}
+        buttonArea.innerHTML = '';
+        const wrap = document.createElement('div');
+        wrap.className = 'buttons';
+        buttons.forEach((b, idx)=>{
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.innerText = b.text;
+          if(b.className) btn.className = b.className;
+          btn.addEventListener('click', ()=> b.onClick(idx));
+          btn.addEventListener('keydown', (ev)=>{
+            if(ev.key === 'Enter') { ev.preventDefault(); b.onClick(idx); }
+          });
+          wrap.appendChild(btn);
+        });
+        buttonArea.appendChild(wrap);
+        // focus first button
+        const first = buttonArea.querySelector('button');
+        if(first) first.focus();
+      }
+
+      function updateProgress(){
+        progress.value = step;
+        progress.max = I18N[lang].questions.length;
+        stepLabel.innerText = `${step}/${I18N[lang].questions.length}`;
+      }
+
+      function startTest(){
+        step = 0; score = 0;
+        clearState();
+        saveState();
+        showQuestion();
+      }
+
+      function showQuestion(){
+        updateProgress();
+        const q = I18N[lang].questions[step];
+        setChat(q);
+        const opts = I18N[lang].options[step];
+        const buttons = opts.map((text, i) => ({
+          text,
+          onClick: ()=> selectAnswer(i+1)
+        }));
+        // add a small hint button row below for restart/lang if needed
+        setButtons(buttons);
+        saveState();
+      }
+
+      function selectAnswer(point){
+        score += point;
+        step++;
+        saveState();
+        if(step < I18N[lang].questions.length){
+          showQuestion();
+        } else {
+          showResult();
+        }
+      }
+
+      function showResult(){
+        updateProgress();
+        // Determine result from score
+        const maxScore = I18N[lang].questions.length * 3;
+        // Using same thresholds as original: <=5 safety, <=7 balanced, else aggressive
+        const s = score;
+        let res;
+        if(s <= 5) res = I18N[lang].results.safety;
+        else if(s <= 7) res = I18N[lang].results.balanced;
+        else res = I18N[lang].results.aggressive;
+
+        setChat(`${res.title}\n\n${res.desc}`);
+        setButtons([
+          { text: I18N[lang].restart, onClick: startTest, className: 'secondary' },
+          { text: I18N[lang].start, onClick: ()=> { step = 0; score = 0; saveState(); showQuestion(); } }
+        ]);
+        // persist final state
+        saveState();
+      }
+
+      // Keyboard shortcuts: 1/2/3 selects current options if visible
+      document.addEventListener('keydown', (ev)=>{
+        // ignore if focus is in input fields (none here but keep generic)
+        const tag = document.activeElement && document.activeElement.tagName;
+        if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+        if(ev.key === '1' || ev.key === '2' || ev.key === '3'){
+          const idx = parseInt(ev.key,10) - 1;
+          // find the idx-th button in buttonArea
+          const btns = buttonArea.querySelectorAll('button');
+          if(btns && btns[idx]){
+            btns[idx].click();
+            ev.preventDefault();
+          }
+        }
+        // space or Enter to trigger focused button will work by default
+      });
+
+      // Language toggle
+      langBtn.addEventListener('click', ()=>{
+        lang = (lang === 'ko') ? 'en' : 'ko';
+        langBtn.innerText = (lang === 'ko') ? 'EN' : 'KR';
+        langBtn.setAttribute('aria-pressed', lang === 'en');
+        // update start/restart label if showing initial screen
+        if(step === 0 && score === 0){
+          setChat(I18N[lang].questions ? I18N[lang].questions[0].split('\n')[0] : chatBox.innerText);
+          startBtn.innerText = I18N[lang].start;
+        }
+        // re-render current state
+        if(step === 0 && score === 0){
+          // show welcome message in selected language
+          setChat(lang === 'ko'
+            ? '안녕하세요!\n당신의 경제적 자립을 도울 **자산 형성 유형 진단 챗봇**입니다。\n\n아래 버튼을 눌러 진단을 시작하세요.'
+            : 'Hello!\nThis is an asset-building diagnostic chatbot to help your financial independence.\n\nPress the button below to start the assessment.');
+          startBtn.innerText = I18N[lang].start;
+        } else if(step < I18N[lang].questions.length){
+          showQuestion();
+        } else {
+          showResult();
+        }
+        saveState();
+      });
+
+      // Start button handler (visible before questions)
+      startBtn.addEventListener('click', ()=>{
+        startTest();
+      });
+
+      // Initialize: try to restore
+      (function init(){
+        const restored = loadState();
+        langBtn.innerText = (lang === 'ko') ? 'EN' : 'KR';
+        langBtn.setAttribute('aria-pressed', lang === 'en');
+        if(restored){
+          // if finished earlier, show result; otherwise resume
+          if(step >= I18N[lang].questions.length){
+            showResult();
+          } else if(step > 0){
+            showQuestion();
+          } else {
+            // show welcome (start button exists)
+            startBtn.innerText = I18N[lang].start;
+          }
+        } else {
+          startBtn.innerText = I18N[lang].start;
+        }
+        // small hint for screen readers
+        document.getElementById('srHints').innerText = I18N[lang].hints;
+        updateProgress();
+      })();
+
+      // Expose for debugging (optional)
+      window.__bini = { startTest, showQuestion, showResult, getState: ()=> ({step,score,lang}) };
+
+    })();
+  </script>
+</body>
+</html>
