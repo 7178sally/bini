@@ -2,179 +2,169 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>자산 관리·형성 유형 진단 챗봇</title>
+  <title>자산 관리 유형 진단 챗봇</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f6fa;
-      margin: 0;
-      padding: 20px;
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f4f6f8; margin:0; padding:20px; }
+    .container { max-width:700px; margin:0 auto; background:#fff; padding:24px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08); }
+    h1 { font-size:1.4rem; margin-bottom:8px; }
+    p { color:#555; }
+    .question { font-size:1.1rem; margin:20px 0 16px; }
+    .choices button {
+      display:block; width:100%; margin-bottom:10px; padding:12px;
+      font-size:1rem; border-radius:8px; border:1px solid #ccc;
+      background:#fafafa; cursor:pointer;
     }
-    .container {
-      max-width: 700px;
-      margin: auto;
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-    }
-    .question {
-      font-size: 1.2em;
-      margin-bottom: 20px;
-    }
-    .options button {
-      display: block;
-      width: 100%;
-      margin: 8px 0;
-      padding: 12px;
-      font-size: 1em;
-      border: none;
-      border-radius: 6px;
-      background: #e9ecef;
-      cursor: pointer;
-    }
-    .options button:hover {
-      background: #d0d7de;
-    }
-    .result {
-      font-size: 1.1em;
-      line-height: 1.6;
-    }
+    .choices button:hover { background:#eef3ff; }
+    .result { margin-top:20px; }
+    .result h2 { margin-top:0; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>자산 관리·형성 유형 진단</h1>
-    <div id="chat">
-      <div class="question" id="question"></div>
-      <div class="options" id="options"></div>
-    </div>
-  </div>
+<div class="container">
+  <h1>자산 관리 유형 진단</h1>
+  <p id="intro">지금부터 간단한 질문을 통해 당신의 자산 관리 유형을 알아볼게요.<br>
+  정답은 없으니, 평소 자신의 모습에 가장 가까운 선택지를 골라 주세요.</p>
+
+  <div id="quiz"></div>
+</div>
 
 <script>
 const questions = [
   {
-    q: "1. 용돈이나 아르바이트비가 생기면 나는 보통",
-    options: [
-      "A. 사고 싶은 것을 먼저 사고 남으면 다행이라고 생각한다",
-      "B. 어느 정도 쓸지 생각은 하지만 계획대로 되지는 않는다",
-      "C. 미리 정해 둔 범위 안에서만 사용하려고 한다",
-      "D. 거의 쓰지 않고 모아 두는 편이다"
+    q: "용돈을 받았을 때 가장 먼저 드는 생각은?",
+    a: [
+      { text: "혹시 필요할지 몰라 남겨 둔다", type: "stable" },
+      { text: "미리 정한 계획대로 쓴다", type: "balance" },
+      { text: "사고 싶은 게 있으면 바로 쓴다", type: "liquid" },
+      { text: "모아서 나중에 큰 목표에 쓴다", type: "profit" }
     ]
   },
   {
-    q: "2. 편의점이나 온라인 쇼핑몰에서 할인 알림을 보면",
-    options: [
-      "A. 필요 없더라도 일단 사고 본다",
-      "B. 잠깐 고민하다가 사는 경우가 많다",
-      "C. 정말 필요한지 한 번 더 생각해 본다",
-      "D. 계획에 없으면 거의 사지 않는다"
+    q: "갑자기 돈이 필요한 상황이 생기면 나는?",
+    a: [
+      { text: "항상 쓸 수 있는 돈을 남겨 둔다", type: "liquid" },
+      { text: "계획이 깨져서 불안하다", type: "balance" },
+      { text: "경험이 중요하니 괜찮다", type: "profit" },
+      { text: "가능한 한 지출을 피한다", type: "stable" }
     ]
   },
   {
-    q: "3. 용돈이나 수입 중 일부를 모으고 있는가?",
-    options: [
-      "A. 거의 모으지 않는다",
-      "B. 가끔 생각날 때만 모은다",
-      "C. 금액은 적지만 꾸준히 모은다",
-      "D. 목표를 정해 두고 모으고 있다"
+    q: "물건을 살 때 나의 기준은?",
+    a: [
+      { text: "꼭 필요한지 여러 번 생각한다", type: "stable" },
+      { text: "예산 안에서면 구매한다", type: "balance" },
+      { text: "지금 만족이 중요하다", type: "liquid" },
+      { text: "나중에 도움이 될지 본다", type: "profit" }
     ]
   },
   {
-    q: "4. 모아 둔 돈은 어떤 상태가 가장 편한가?",
-    options: [
-      "A. 언제든 바로 쓸 수 있어야 한다",
-      "B. 급할 때만 쓸 수 있으면 된다",
-      "C. 당분간 못 써도 괜찮다",
-      "D. 오래 묶여 있어도 상관없다"
+    q: "저축에 대한 나의 생각은?",
+    a: [
+      { text: "안전하게 모으는 게 최고다", type: "stable" },
+      { text: "쓰는 것과 모으는 것의 균형이 중요", type: "balance" },
+      { text: "필요하면 언제든 쓸 수 있어야 한다", type: "liquid" },
+      { text: "미래를 위해 적극적으로 준비해야 한다", type: "profit" }
     ]
   },
   {
-    q: "5. 돈을 불릴 수 있다면 손해 볼 가능성도",
-    options: [
-      "A. 전혀 감수하고 싶지 않다",
-      "B. 아주 조금이라면 괜찮다",
-      "C. 어느 정도는 감수할 수 있다",
-      "D. 기회가 된다면 도전해 보고 싶다"
+    q: "위험이 있는 선택 상황이라면?",
+    a: [
+      { text: "가능하면 피한다", type: "stable" },
+      { text: "장단점을 비교해 본다", type: "balance" },
+      { text: "지금 도움이 되면 선택한다", type: "liquid" },
+      { text: "성장 가능성이 있으면 시도한다", type: "profit" }
     ]
   },
   {
-    q: "6. 다음 중 더 끌리는 것은?",
-    options: [
-      "A. 지금 당장 즐길 수 있는 소비",
-      "B. 가까운 미래를 위한 저축",
-      "C. 꽤 먼 미래를 위한 준비",
-      "D. 잘 모르겠다"
+    q: "나의 소비 습관에 가장 가까운 모습은?",
+    a: [
+      { text: "계획 없이 쓰는 경우는 거의 없다", type: "stable" },
+      { text: "대체로 계획대로 조절한다", type: "balance" },
+      { text: "순간의 선택에 따라 달라진다", type: "liquid" },
+      { text: "목표를 위해 아끼거나 쓴다", type: "profit" }
     ]
   },
   {
-    q: "7. 현재 돈과 관련해 떠오르는 목표가 있다면?",
-    options: [
-      "A. 딱히 없다",
-      "B. 갖고 싶은 물건이나 하고 싶은 활동이 있다",
-      "C. 대학 생활이나 자격증 등을 위한 준비",
-      "D. 여러 목표를 함께 생각하고 있다"
+    q: "미래 목표(대학, 여행 등)에 대해 나는?",
+    a: [
+      { text: "막연하지만 불안하지 않다", type: "stable" },
+      { text: "구체적으로 생각해 본 적이 있다", type: "balance" },
+      { text: "지금이 더 중요하다", type: "liquid" },
+      { text: "목표를 이루고 싶어 준비 중이다", type: "profit" }
     ]
   },
   {
-    q: "8. ‘경제적 자립’이라는 말을 들으면",
-    options: [
-      "A. 아직은 실감이 나지 않는다",
-      "B. 언젠가는 필요하다고 생각한다",
-      "C. 중요하다고 느끼고 있다",
-      "D. 구체적으로 준비하고 싶다"
+    q: "돈을 관리할 때 가장 중요하다고 생각하는 것은?",
+    a: [
+      { text: "안전성", type: "stable" },
+      { text: "균형", type: "balance" },
+      { text: "유동성", type: "liquid" },
+      { text: "수익성", type: "profit" }
     ]
   }
 ];
 
-let current = 0;
-let score = { A: 0, B: 0, C: 0, D: 0 };
+let index = 0;
+let score = { stable:0, balance:0, liquid:0, profit:0 };
+const quiz = document.getElementById("quiz");
 
 function showQuestion() {
-  const q = questions[current];
-  document.getElementById('question').innerText = q.q;
-  const optionsDiv = document.getElementById('options');
-  optionsDiv.innerHTML = '';
-
-  q.options.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.innerText = opt;
-    btn.onclick = () => selectOption(opt.charAt(0));
-    optionsDiv.appendChild(btn);
+  const q = questions[index];
+  quiz.innerHTML = `<div class="question">${index+1}. ${q.q}</div>`;
+  const div = document.createElement("div");
+  div.className = "choices";
+  q.a.forEach(c => {
+    const btn = document.createElement("button");
+    btn.textContent = c.text;
+    btn.onclick = () => { score[c.type]++; index++; index < questions.length ? showQuestion() : showResult(); };
+    div.appendChild(btn);
   });
-}
-
-function selectOption(letter) {
-  score[letter]++;
-  current++;
-  if (current < questions.length) {
-    showQuestion();
-  } else {
-    showResult();
-  }
+  quiz.appendChild(div);
 }
 
 function showResult() {
-  const maxType = Object.keys(score).reduce((a, b) => score[a] > score[b] ? a : b);
-  const resultDiv = document.getElementById('chat');
+  const type = Object.keys(score).reduce((a,b)=>score[a]>score[b]?a:b);
+  const results = {
+    stable: {
+      name:"안정 중시형",
+      text:"돈을 쓸 때 신중하며, 안전과 대비를 중요하게 여기는 유형입니다.",
+      pros:"충동 소비가 적고 계획적인 생활이 가능합니다.",
+      cons:"필요한 경험까지 지나치게 아낄 수 있습니다.",
+      tips:"① 용돈 일부를 자유 사용 금액으로 정해 보기<br>② 월 1회 소비 점검하기<br>③ 작은 목표 하나 세워 보기"
+    },
+    balance: {
+      name:"균형 관리형",
+      text:"소비와 저축의 균형을 잘 맞추려는 유형입니다.",
+      pros:"계획성과 유연성을 함께 갖추고 있습니다.",
+      cons:"상황에 따라 우선순위가 흔들릴 수 있습니다.",
+      tips:"① 고정 저축 비율 정하기<br>② 소비 기록 간단히 남기기<br>③ 단기 목표와 장기 목표 구분하기"
+    },
+    liquid: {
+      name:"유동성 우선형",
+      text:"지금 필요할 때 바로 쓸 수 있는 돈을 중시하는 유형입니다.",
+      pros:"상황 대응력이 뛰어납니다.",
+      cons:"계획 없는 지출이 늘어날 수 있습니다.",
+      tips:"① 소비 전 10초 생각하기<br>② 주간 지출 한도 정하기<br>③ 남는 돈은 따로 보관하기"
+    },
+    profit: {
+      name:"수익 추구형",
+      text:"미래의 성장과 목표 달성을 중요하게 여기는 유형입니다.",
+      pros:"목표 의식이 분명하고 동기가 강합니다.",
+      cons:"현재 생활의 균형을 놓칠 수 있습니다.",
+      tips:"① 현실적인 목표 금액 설정<br>② 소비·저축 균형 점검<br>③ 꾸준히 기록하는 습관 기르기"
+    }
+  };
 
-  let resultText = '';
-
-  if (maxType === 'A') {
-    resultText = `<strong>즉시만족형</strong><br><br>지금의 즐거움을 중요하게 여기는 유형입니다.<br><br><strong>실천 팁</strong><ul><li>지출 전 10분만 고민하기</li><li>한 달에 한 번 소비 기록하기</li><li>소액이라도 저축 경험 만들기</li></ul>`;
-  } else if (maxType === 'B') {
-    resultText = `<strong>유연하지만 계획이 약한 유형</strong><br><br>상황에 따라 소비와 저축을 조절하는 편입니다.<br><br><strong>실천 팁</strong><ul><li>고정 저축 금액 정하기</li><li>소비 목표와 저축 목표 구분하기</li><li>주간 지출 한도 설정하기</li></ul>`;
-  } else if (maxType === 'C') {
-    resultText = `<strong>안정·계획형</strong><br><br>비교적 균형 잡힌 자산 관리 성향입니다.<br><br><strong>실천 팁</strong><ul><li>장기 목표 하나 정하기</li><li>저축 이유를 글로 적어보기</li><li>소비 만족도 점검하기</li></ul>`;
-  } else {
-    resultText = `<strong>목표·장기설계형</strong><br><br>미래를 생각하며 돈을 관리하려는 유형입니다.<br><br><strong>실천 팁</strong><ul><li>목표별 통장 나누기</li><li>현실적인 기간 설정하기</li><li>지금 즐기는 소비도 허용하기</li></ul>`;
-  }
-
-  resultDiv.innerHTML = `<div class='result'>${resultText}<br><br><em>이번 달에 하나만 실천한다면 무엇을 선택하겠나요?</em></div>`;
+  const r = results[type];
+  quiz.innerHTML = `<div class="result">
+    <h2>나의 자산 관리 유형: ${r.name}</h2>
+    <p><strong>특징</strong><br>${r.text}</p>
+    <p><strong>장점</strong><br>${r.pros}</p>
+    <p><strong>보완하면 좋을 점</strong><br>${r.cons}</p>
+    <p><strong>고등학생 실천 조언</strong><br>${r.tips}</p>
+    <p>모든 유형에는 장단점이 있으며, 연습을 통해 조절할 수 있습니다.</p>
+  </div>`;
 }
 
 showQuestion();
